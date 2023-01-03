@@ -10,6 +10,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using System.Configuration;
+using System.Runtime.InteropServices;
 
 namespace Pinger
 {
@@ -134,6 +135,8 @@ namespace Pinger
                 // Update our values
                 if (Int16.TryParse(subStr, out short val))
                 {
+                    m_data.LowestPing = Math.Min(val, m_data.LowestPing);
+                    m_data.HighestPing = Math.Max(val, m_data.HighestPing);
                     m_data.CurPing = val;
                     m_avgList.Add(m_data.CurPing);
                     m_data.AvgPing = m_avgList.GetAverage();
@@ -194,11 +197,13 @@ namespace Pinger
             startInfo.FileName = command;
 
             newProcess.StartInfo = startInfo;
+            newProcess.EnableRaisingEvents = true;
 
             newProcess.OutputDataReceived += new DataReceivedEventHandler
             (
                 delegate (object sender, DataReceivedEventArgs e)
                 {
+                    m_data.FinalOutput += $"{e.Data}\n";
                     finalOutput.Append(e.Data);
                     onData(e.Data);
                 }
@@ -208,6 +213,7 @@ namespace Pinger
             (
                 delegate (object sender, DataReceivedEventArgs e)
                 {
+                    m_data.FinalOutput += $"{e.Data}\n";
                     finalOutput.Append(e.Data);
                     onError(e.Data);
                 }
@@ -351,11 +357,17 @@ namespace Pinger
             public int AvgPing = -1;
             public int PacketLoss = 0;
             public int PingCount = 0;
+            public int HighestPing = int.MinValue;
+            public int LowestPing = int.MaxValue;
+            public string FinalOutput = "";
 
             public void Save(ConfigVals configVals)
             {
                 DateTime dateTime = DateTime.Now;
                 string fileName = $"output-{dateTime.Day}_{dateTime.Month}_{dateTime.Year}-{dateTime.Hour}_{dateTime.Minute}_{dateTime.Second}.txt";
+
+                int high = HighestPing == int.MinValue ? -1 : HighestPing;
+                int low = LowestPing == int.MaxValue ? -1 : LowestPing;
 
                 string finalDir = $"{Directory.GetCurrentDirectory()}/{fileName}";
                 string data =
@@ -363,7 +375,11 @@ namespace Pinger
                     $"Last ping: {CurPing}\n" +
                     $"Average ping: {AvgPing}\n" +
                     $"Packets lost: {PacketLoss}\n" +
-                    $"Ping count: {PingCount}\n\n" +
+                    $"Ping count: {PingCount}\n" +
+                    $"Highest ping: {high}\n" +
+                    $"Lowest ping: {low}\n\n" +
+                    $"\tFull output:\n" +
+                    FinalOutput;
                     configVals.GetString();
                 File.WriteAllText(finalDir, data);
             }
